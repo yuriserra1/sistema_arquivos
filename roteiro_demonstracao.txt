@@ -1,0 +1,87 @@
+senhaRoot
+root
+senhaRoot
+cd /
+mkdir demonstracao
+cd demonstracao
+touch vazio.txt
+echo "conteudo legal" > arquivo.txt
+echo " e mais conteudo" >> arquivo.txt
+cat arquivo.txt
+cp arquivo.txt copia.txt
+mv copia.txt renomeado.txt
+ln -s arquivo.txt atalho.txt
+cat atalho.txt
+mkdir temporaria
+rmdir temporaria
+mkdir subpasta
+ln -s subpasta atalho_dir
+cd atalho_dir
+cd ..
+rm atalho_dir
+rm atalho.txt
+rm renomeado.txt
+rm vazio.txt
+rmdir subpasta
+cd /
+mkdir destino
+mv demonstracao /destino
+cat /destino/demonstracao/arquivo.txt
+ls /destino/demonstracao
+whoami
+useradd alice
+senhaAlice
+useradd bob
+senhaBob
+ls -l /home
+ls -l /etc
+cat /etc/shadow
+logout
+alice
+senhaErrada
+alice
+senhaAlice
+whoami
+echo "segredo da alice" > diario.txt
+echo "texto publico" > publico.txt
+ls -l
+cat /etc/shadow
+cp /etc/shadow roubo.txt
+echo "hacker:x:y" >> /etc/shadow
+rm /etc/shadow
+mkdir /home/invasao
+chown alice publico.txt
+chmod rw-- diario.txt
+chmod 64 publico.txt
+chmod rwr- /home/alice
+ls -l /home
+logout
+bob
+senhaBob
+cat /home/alice/publico.txt
+cat /home/alice/diario.txt
+echo "bob passou aqui" >> /home/alice/publico.txt
+chmod rwrw /home/alice/publico.txt
+rm /home/alice/publico.txt
+logout
+root
+senhaRoot
+cat /home/alice/diario.txt
+chown bob /home/alice/publico.txt
+chown fulano /home/alice/publico.txt
+logout
+bob
+senhaBob
+echo " (agora o arquivo e do bob)" >> /home/alice/publico.txt
+cat /home/alice/publico.txt
+ls -l /home/alice
+passwd
+senhaBob
+novaSenhaBob
+logout
+bob
+senhaBob
+bob
+novaSenhaBob
+whoami
+exit

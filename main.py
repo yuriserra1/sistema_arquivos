@@ -1,7 +1,12 @@
 # Bibliotecas utilizadas pelo sistema.
+import getpass
+import hashlib
+import hmac
 import os
 import pickle
+import re
 import shlex
+import sys
 from collections import deque
 from contextlib import contextmanager
 from copy import deepcopy
@@ -31,6 +36,15 @@ atual = 0
 # Blocos preparados pelo comando atual; None significa fora de uma alteração.
 gravacoes = None
 proximo_bloco_livre = INICIO_DADOS
+
+# Segurança. Permissões têm 4 caracteres: leitura/escrita do dono e dos
+# demais usuários. Ex.: "rwr-" = dono lê e escreve; os demais só leem.
+PERM_PADRAO = "rwr-"
+PERM_PRIVADA = "rw--"
+# Repetições do PBKDF2: tornam cada tentativa de adivinhar a senha mais lenta.
+ITERACOES_HASH = 100_000
+# Usuário autenticado; None antes do login. "root" ignora as permissões.
+usuario_atual = None
 
 
 def agora():
@@ -97,6 +111,13 @@ def carregar():
             or not all(mapa_bloco[:INICIO_DADOS])
             or not tabela[0] or tabela[0]["tipo"] != "diretorio"):
         raise ValueError("Imagem inválida: tabela ou mapas inconsistentes")
+    # Imagens da versão anterior usavam "rwxr-x" e o dono fictício "usuario":
+    # descarta o x (não usado) e entrega as entradas ao root.
+    for inode in tabela:
+        if inode and len(inode["permissoes"]) == 6:
+            p = inode["permissoes"]
+            inode["permissoes"] = p[0:2] + p[3:5]
+            inode["dono"] = "root"
     faltam = MAX_INODES - len(tabela)
     inodes = tabela + [None] * faltam
     bitmap_inode = mapa_inode + [0] * faltam
@@ -109,16 +130,18 @@ def carregar():
 # -------------------- I-NODES E BLOCOS --------------------
 
 
-def novo_inode(nome, tipo):
+def novo_inode(nome, tipo, dono=None, permissoes=PERM_PADRAO):
+    # Sem dono explícito, a entrada pertence a quem a criou.
+    dono = dono or usuario_atual or "root"
     try:
         i = bitmap_inode.index(0)
     except ValueError:
         raise OSError("Sem i-nodes livres") from None
     bitmap_inode[i] = 1
     inodes[i] = {
-        "nome": nome, "tipo": tipo, "criador": "usuario", "dono": "usuario",
+        "nome": nome, "tipo": tipo, "criador": dono, "dono": dono,
         "tamanho": 0, "criacao": agora(), "modificacao": agora(),
-        "permissoes": "rwxr-x",
+        "permissoes": permissoes,
         "blocos": [-1] * PONTEIROS_POR_INODE,
         "proximo": -1
     }
@@ -309,11 +332,16 @@ def resolver(caminho, seguir_ultimo=True, inicio=None, criar_arquivo=False):
     while partes:
         nome = partes.popleft()
         pai = i
+        # Sem bit x, consultar os nomes de um diretório exige leitura.
+        if inodes[pai]["tipo"] == "diretorio":
+            exigir(pai, "r")
         d = ler_dir(pai)
         if nome not in d:
             if not criar_arquivo or partes:
                 raise FileNotFoundError("Caminho não encontrado")
             validar_nome(nome)
+            # Criar uma entrada altera o diretório pai.
+            exigir(pai, "w")
             i = novo_inode(nome, "arquivo")
             adicionar(pai, nome, i)
         else:
@@ -352,12 +380,190 @@ def pai_nome(caminho):
     return (resolver(pai or "/") if separador else atual), nome
 
 
+# -------------------- PERMISSÕES --------------------
+
+
+def pode(i, acao):
+    """Diz se o usuário atual pode executar a ação ("r" ou "w") no i-node.
+
+    O dono usa os dois primeiros caracteres das permissões; os demais
+    usuários, os dois últimos. O root não é limitado, como no Unix.
+    """
+    if usuario_atual == "root":
+        return True
+    inode = inodes[i]
+    perm = inode["permissoes"]
+    conjunto = perm[:2] if inode["dono"] == usuario_atual else perm[2:]
+    return acao in conjunto
+
+
+def exigir(i, acao):
+    # Interrompe o comando; a transação desfaz o que já tinha sido preparado.
+    if not pode(i, acao):
+        tipo = "leitura" if acao == "r" else "escrita"
+        raise PermissionError(f"Permissão negada ({tipo}): {inodes[i]['nome']}")
+
+
+def exigir_root():
+    if usuario_atual != "root":
+        raise PermissionError("Permissão negada: comando exclusivo do root")
+
+
+def converter_modo(modo):
+    """Aceita "rwr-" (dono e demais) ou dois dígitos em que r=4 e w=2 (ex.: 64)."""
+    if re.fullmatch(r"[0246]{2}", modo):
+        return "".join(("r" if int(d) & 4 else "-") + ("w" if int(d) & 2 else "-")
+                       for d in modo)
+    if re.fullmatch(r"[r-][w-][r-][w-]", modo):
+        return modo
+    raise ValueError("Permissão inválida: use 4 caracteres (ex.: rwr-) "
+                     "ou 2 dígitos com r=4 e w=2 (ex.: 64)")
+
+
+def chmod(modo, caminho):
+    # Somente o dono ou o root alteram as permissões.
+    i = resolver(caminho)
+    if usuario_atual not in ("root", inodes[i]["dono"]):
+        raise PermissionError("Permissão negada: somente o dono ou o root usam chmod")
+    inodes[i]["permissoes"] = converter_modo(modo)
+
+
+def chown(dono, caminho):
+    # Como no Unix, só o root troca o dono; senão um usuário poderia "doar"
+    # arquivos a outro e burlar o controle de quem é responsável por eles.
+    exigir_root()
+    if dono not in ler_shadow():
+        raise ValueError("Usuário inexistente")
+    inodes[resolver(caminho)]["dono"] = dono
+
+
+# -------------------- USUÁRIOS E SENHAS --------------------
+# As contas ficam em /etc/shadow, no próprio disco virtual, com dono root e
+# permissões "rw--": usuários comuns não conseguem ler, copiar, alterar nem
+# remover esse arquivo. Cada linha é "usuario:sal:hash", com o hash PBKDF2-SHA256
+# da senha. A senha em texto plano nunca é gravada.
+
+
+def inode_shadow():
+    # Acesso interno do sistema, sem verificar as permissões do usuário.
+    return ler_dir(ler_dir(0)["etc"])["shadow"]
+
+
+def ler_shadow():
+    """Retorna {usuario: (sal_hex, hash_hex)}."""
+    contas = {}
+    for linha in ler(inode_shadow()).decode().splitlines():
+        nome, sal, resumo = linha.split(":")
+        contas[nome] = (sal, resumo)
+    return contas
+
+
+def gravar_shadow(contas):
+    escrever(inode_shadow(), "".join(f"{nome}:{sal}:{resumo}\n"
+                                     for nome, (sal, resumo) in contas.items()))
+
+
+def gerar_hash(senha, sal=None):
+    """Hash com sal aleatório: senhas iguais geram hashes diferentes."""
+    sal = sal or os.urandom(16)
+    resumo = hashlib.pbkdf2_hmac("sha256", senha.encode(), sal, ITERACOES_HASH)
+    return sal.hex(), resumo.hex()
+
+
+def conferir_senha(nome, senha):
+    conta = ler_shadow().get(nome)
+    if conta is None:
+        return False
+    sal, resumo = conta
+    # compare_digest leva o mesmo tempo independentemente de onde difere.
+    return hmac.compare_digest(gerar_hash(senha, bytes.fromhex(sal))[1], resumo)
+
+
+def definir_senha(nome, senha):
+    if not senha:
+        raise ValueError("A senha não pode ser vazia")
+    contas = ler_shadow()
+    contas[nome] = gerar_hash(senha)
+    gravar_shadow(contas)
+
+
+def ler_senha(mensagem):
+    # Em terminal, getpass não mostra o que é digitado; em roteiros (entrada
+    # redirecionada) a senha é lida como uma linha comum.
+    if sys.stdin.isatty():
+        return getpass.getpass(mensagem)
+    return input(mensagem)
+
+
+def home_de(nome):
+    raiz = ler_dir(0)
+    if nome == "root":
+        return raiz["root"]
+    return ler_dir(raiz["home"]).get(nome, 0)
+
+
+def useradd(nome, senha):
+    # Cria a conta e a home /home/nome, acessível apenas ao novo usuário.
+    exigir_root()
+    validar_nome(nome)
+    if not re.fullmatch(r"[a-z_][a-z0-9_-]{0,31}", nome):
+        raise ValueError("Nome de usuário inválido: use letras minúsculas, "
+                         "números, _ ou -")
+    home = ler_dir(0)["home"]
+    if nome in ler_shadow() or nome in ler_dir(home):
+        raise FileExistsError("Usuário já existe")
+    definir_senha(nome, senha)
+    criar_dir(home, nome, nome, PERM_PRIVADA)
+
+
+def passwd(nome, senha):
+    # Cada usuário troca a própria senha; o root troca a de qualquer um.
+    if nome != usuario_atual:
+        exigir_root()
+    if nome not in ler_shadow():
+        raise ValueError("Usuário inexistente")
+    definir_senha(nome, senha)
+
+
+def login(nome, senha):
+    global usuario_atual, atual
+    # Mesma mensagem para usuário inexistente e senha errada.
+    if not conferir_senha(nome, senha):
+        raise PermissionError("Usuário ou senha incorretos")
+    usuario_atual = nome
+    atual = home_de(nome)
+
+
+def logout():
+    global usuario_atual, atual
+    usuario_atual = None
+    atual = 0
+
+
+def preparar_estrutura():
+    """Cria /etc/shadow, /home e /root em imagens novas ou da versão anterior."""
+    raiz = ler_dir(0)
+    if ("home" in raiz and "root" in raiz and "etc" in raiz
+            and "shadow" in ler_dir(raiz["etc"])):
+        return
+    with transacao():
+        for nome, perm in (("etc", PERM_PADRAO), ("home", PERM_PADRAO),
+                           ("root", PERM_PRIVADA)):
+            if nome not in ler_dir(0):
+                criar_dir(0, nome, "root", perm)
+        etc = ler_dir(0)["etc"]
+        if "shadow" not in ler_dir(etc):
+            adicionar(etc, "shadow", novo_inode("shadow", "arquivo", "root",
+                                                PERM_PRIVADA))
+
+
 # -------------------- ARQUIVOS --------------------
 
 
 def touch(caminho):
     """Cria um arquivo vazio ou atualiza a data da entrada existente."""
     i = resolver(caminho, criar_arquivo=True)
+    exigir(i, "w")
     inodes[i]["modificacao"] = agora()
 
 
@@ -369,6 +575,8 @@ def rm(caminho):
         raise ValueError("Use rmdir")
 
     pai, nome = pai_nome(caminho)
+    # Remover altera o diretório pai, como no Unix.
+    exigir(pai, "w")
     remover_entrada(pai, nome)
     apagar_inode(i)
 
@@ -380,6 +588,7 @@ def cat(caminho):
     if inodes[i]["tipo"] == "diretorio":
         raise IsADirectoryError("É diretório")
 
+    exigir(i, "r")
     print(ler(i).decode())
 
 
@@ -387,6 +596,7 @@ def echo(texto, caminho, append=False):
     i = resolver(caminho, criar_arquivo=True)
     if inodes[i]["tipo"] != "arquivo":
         raise IsADirectoryError("Destino não é arquivo")
+    exigir(i, "w")
     dados = ler(i) if append else b""
     escrever(i, dados + texto.encode())
 
@@ -395,6 +605,7 @@ def cp(origem, destino):
     i = resolver(origem)
     if inodes[i]["tipo"] != "arquivo":
         raise IsADirectoryError("Origem não é arquivo")
+    exigir(i, "r")
     try:
         d = resolver(destino)
         if inodes[d]["tipo"] == "diretorio":
@@ -407,24 +618,32 @@ def cp(origem, destino):
         raise IsADirectoryError("Destino não é arquivo")
     if d == i:
         raise ValueError("Origem e destino são o mesmo arquivo")
+    exigir(d, "w")
     escrever(d, ler(i))
 
 
 # -------------------- DIRETÓRIOS --------------------
 
 
+def criar_dir(pai, nome, dono=None, permissoes=PERM_PADRAO):
+    i = novo_inode(nome, "diretorio", dono, permissoes)
+    # '.' aponta para si mesmo; '..' aponta para o pai.
+    salvar_dir(i, {".": i, "..": pai})
+    adicionar(pai, nome, i)
+    return i
+
+
 def mkdir(caminho):
     # Cria um diretório e o registra no diretório pai.
     pai, nome = pai_nome(caminho)
+    exigir(pai, "r")
     d = ler_dir(pai)
 
     if nome in d:
         raise FileExistsError("Já existe")
 
-    i = novo_inode(nome, "diretorio")
-    # '.' aponta para si mesmo; '..' aponta para o pai.
-    salvar_dir(i, {".": i, "..": pai})
-    adicionar(pai, nome, i)
+    exigir(pai, "w")
+    criar_dir(pai, nome)
 
 
 def rmdir(caminho):
@@ -447,20 +666,29 @@ def rmdir(caminho):
         raise ValueError("Diretório não vazio")
 
     pai, nome = pai_nome(caminho)
+    exigir(pai, "w")
     remover_entrada(pai, nome)
     apagar_inode(i)
 
 
-def ls(caminho="."):
+def descrever(i, nome):
+    # Linha do ls -l: tipo, permissões (dono e demais), dono, tamanho e nome.
+    inode = inodes[i]
+    tipo = {"diretorio": "d", "link": "l"}.get(inode["tipo"], "-")
+    return f"{tipo}{inode['permissoes']}  {inode['dono']:<10} {inode['tamanho']:>8}  {nome}"
+
+
+def ls(caminho=".", longo=False):
     # Lista as entradas do diretório ou o nome de um arquivo.
     i = atual if caminho == "." else resolver(caminho)
 
     if inodes[i]["tipo"] != "diretorio":
-        print(inodes[i]["nome"])
+        print(descrever(i, inodes[i]["nome"]) if longo else inodes[i]["nome"])
         return
 
-    for nome in ler_dir(i):
-        print(nome)
+    exigir(i, "r")
+    for nome, filho in ler_dir(i).items():
+        print(descrever(filho, nome) if longo else nome)
 
 
 def cd(caminho):
@@ -472,6 +700,7 @@ def cd(caminho):
     if inodes[i]["tipo"] != "diretorio":
         raise NotADirectoryError("Não é diretório")
 
+    exigir(i, "r")
     atual = i
 
 
@@ -514,6 +743,13 @@ def mv(origem, destino):
     if nome2 in ler_dir(pai2):
         raise FileExistsError("Destino já existe")
 
+    # Mover altera os dois diretórios pais; um diretório que troca de pai
+    # também tem a entrada '..' reescrita.
+    exigir(pai1, "w")
+    exigir(pai2, "w")
+    if inodes[i]["tipo"] == "diretorio" and pai1 != pai2:
+        exigir(i, "w")
+
     # Prepara primeiro o destino. A transação desfaz toda a operação se falhar.
     if pai1 == pai2:
         entradas = ler_dir(pai1)
@@ -540,10 +776,12 @@ def ln(alvo, link):
     if link.endswith("/"):
         raise ValueError("O nome do novo link não deve terminar com /")
     pai, nome = pai_nome(link)
+    exigir(pai, "r")
 
     if nome in ler_dir(pai):
         raise FileExistsError("Já existe")
 
+    exigir(pai, "w")
     i = novo_inode(nome, "link")
     # Armazena o caminho do alvo, sem copiar seu conteúdo.
     escrever(i, alvo)
@@ -555,10 +793,12 @@ def ln(alvo, link):
 
 def inicializar():
     global f, inodes, bitmap_inode, bitmap_bloco, atual, proximo_bloco_livre
+    global usuario_atual
     inodes = [None] * MAX_INODES
     bitmap_inode = [0] * MAX_INODES
     bitmap_bloco = [0] * TOTAL_BLOCOS
     atual = 0
+    usuario_atual = None
     proximo_bloco_livre = INICIO_DADOS
     novo = not os.path.exists(DISCO)
     f = open(DISCO, "w+b" if novo else "r+b")
@@ -568,10 +808,11 @@ def inicializar():
             for i in range(INICIO_DADOS):
                 bitmap_bloco[i] = 1
             with transacao():
-                raiz = novo_inode("/", "diretorio")
+                raiz = novo_inode("/", "diretorio", "root")
                 salvar_dir(raiz, {".": 0, "..": 0})
         else:
             carregar()
+        preparar_estrutura()
     except BaseException:
         f.close()
         f = None
@@ -596,16 +837,41 @@ def executar(linha):
             echo(p[1], p[3], p[2] == ">>")
     elif cmd == "cat" and len(p) == 2:
         cat(p[1])
-    elif cmd == "ls" and len(p) <= 2:
-        ls(p[1] if len(p) == 2 else ".")
+    elif cmd == "ls" and len(p) <= 3:
+        longo = len(p) > 1 and p[1] == "-l"
+        args = p[2:] if longo else p[1:]
+        if len(args) > 1:
+            raise ValueError("Use ls [-l] [caminho]")
+        ls(args[0] if args else ".", longo)
     elif cmd == "cd" and len(p) == 2:
         cd(p[1])
+    elif cmd == "whoami" and len(p) == 1:
+        print(usuario_atual)
+    elif cmd == "logout" and len(p) == 1:
+        logout()
+    elif cmd == "useradd" and len(p) == 2:
+        # Valida antes de pedir a senha, para não perguntar à toa.
+        exigir_root()
+        senha = ler_senha(f"Senha para {p[1]}: ")
+        with transacao():
+            useradd(p[1], senha)
+    elif cmd == "passwd" and len(p) <= 2:
+        nome = p[1] if len(p) == 2 else usuario_atual
+        if nome != usuario_atual:
+            exigir_root()
+        elif usuario_atual != "root" and not conferir_senha(
+                nome, ler_senha("Senha atual: ")):
+            raise PermissionError("Senha atual incorreta")
+        senha = ler_senha(f"Nova senha para {nome}: ")
+        with transacao():
+            passwd(nome, senha)
     elif cmd == "exit" and len(p) == 1:
         return False
     else:
         # A tabela evita repetir a mesma validação para cada comando.
         comandos = {"touch": (touch, 1), "rm": (rm, 1), "cp": (cp, 2),
-                    "mv": (mv, 2), "mkdir": (mkdir, 1), "rmdir": (rmdir, 1)}
+                    "mv": (mv, 2), "mkdir": (mkdir, 1), "rmdir": (rmdir, 1),
+                    "chmod": (chmod, 2), "chown": (chown, 2)}
         if cmd == "ln" and len(p) == 4 and p[1] == "-s":
             with transacao():
                 ln(p[2], p[3])
@@ -621,6 +887,17 @@ def executar(linha):
 # -------------------- TERMINAL INTERATIVO --------------------
 
 
+def autenticar():
+    """Na primeira execução define a senha do root; depois pede o login."""
+    if "root" not in ler_shadow():
+        print("Primeira execução: defina a senha do usuário root.")
+        senha = ler_senha("Nova senha do root: ")
+        with transacao():
+            definir_senha("root", senha)
+    login(input("login: ").strip(), ler_senha("senha: "))
+    print(f"Bem-vindo(a), {usuario_atual}.")
+
+
 def main():
     try:
         inicializar()
@@ -632,7 +909,11 @@ def main():
     try:
         while True:
             try:
-                linha = input("myfs> ")
+                # Nenhum comando é aceito antes de um login bem-sucedido.
+                if usuario_atual is None:
+                    autenticar()
+                    continue
+                linha = input(f"{usuario_atual}@myfs> ")
                 if executar(linha) is False:
                     break
             except (EOFError, KeyboardInterrupt):

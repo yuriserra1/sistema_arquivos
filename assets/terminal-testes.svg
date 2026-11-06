@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" viewBox="0 0 920 420" font-family="Consolas, Menlo, monospace" font-size="14">
+  <rect width="920" height="420" rx="12" fill="#0d1117"/>
+  <rect width="920" height="38" rx="12" fill="#161b22"/>
+  <rect y="26" width="920" height="12" fill="#161b22"/>
+  <circle cx="24" cy="19" r="6" fill="#ff5f56"/><circle cx="44" cy="19" r="6" fill="#ffbd2e"/><circle cx="64" cy="19" r="6" fill="#27c93f"/>
+  <text x="460" y="24" fill="#8b949e" text-anchor="middle" font-size="13">python -m unittest -v testes — 40 testes automáticos</text>
+
+  <g fill="#c9d1d9">
+    <text x="24" y="70"><tspan fill="#8b949e">$</tspan> python -m unittest -v testes</text>
+    <text x="24" y="98" fill="#8b949e">… 31 testes do sistema de arquivos (blocos, i-nodes, links, disco cheio, persistência)</text>
+    <text x="24" y="126">test_senhas_com_hash_e_sal <tspan fill="#8b949e">..........................</tspan> <tspan fill="#3fb950">ok</tspan></text>
+    <text x="24" y="150">test_shadow_inacessivel_a_usuario_comum <tspan fill="#8b949e">.............</tspan> <tspan fill="#3fb950">ok</tspan></text>
+    <text x="24" y="174">test_home_privada_e_permissoes_dono_demais <tspan fill="#8b949e">..........</tspan> <tspan fill="#3fb950">ok</tspan></text>
+    <text x="24" y="198">test_chmod_formatos <tspan fill="#8b949e">.................................</tspan> <tspan fill="#3fb950">ok</tspan></text>
+    <text x="24" y="222">test_chown_somente_root <tspan fill="#8b949e">.............................</tspan> <tspan fill="#3fb950">ok</tspan></text>
+    <text x="24" y="246">test_comandos_de_root_e_passwd <tspan fill="#8b949e">......................</tspan> <tspan fill="#3fb950">ok</tspan></text>
+    <text x="24" y="270">test_permissoes_persistem_e_imagem_antiga_migra <tspan fill="#8b949e">.....</tspan> <tspan fill="#3fb950">ok</tspan></text>
+    <text x="24" y="294">test_terminal_exige_login <tspan fill="#8b949e">...........................</tspan> <tspan fill="#3fb950">ok</tspan></text>
+    <text x="24" y="318">test_roteiro_demonstracao_do_pacote <tspan fill="#8b949e">.................</tspan> <tspan fill="#3fb950">ok</tspan></text>
+    <text x="24" y="352" fill="#8b949e">----------------------------------------------------------------------</text>
+    <text x="24" y="376">Ran 40 tests in 8.791s</text>
+    <text x="24" y="400"><tspan fill="#3fb950" font-weight="700">OK</tspan></text>
+  </g>
+</svg>

@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 400" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="seta" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
+    </marker>
+  </defs>
+  <rect width="920" height="400" rx="14" fill="#0f172a"/>
+  <text x="40" y="48" fill="#f8fafc" font-size="22" font-weight="700">Como uma permissão é decidida</text>
+  <text x="40" y="72" fill="#94a3b8" font-size="14">Quatro caracteres por i-node: leitura e escrita do dono, leitura e escrita dos demais. Não há bit x.</text>
+
+  <!-- string de permissão -->
+  <text x="40" y="150" fill="#64748b" font-family="Consolas, Menlo, monospace" font-size="54" font-weight="700">-</text>
+  <text x="80" y="150" fill="#5eead4" font-family="Consolas, Menlo, monospace" font-size="54" font-weight="700">rw</text>
+  <text x="160" y="150" fill="#cbd5e1" font-family="Consolas, Menlo, monospace" font-size="54" font-weight="700">r-</text>
+  <line x1="82" y1="166" x2="146" y2="166" stroke="#5eead4" stroke-width="3"/>
+  <line x1="162" y1="166" x2="226" y2="166" stroke="#cbd5e1" stroke-width="3"/>
+  <text x="40" y="196" fill="#94a3b8" font-size="13">tipo</text>
+  <text x="82" y="196" fill="#5eead4" font-size="13">dono</text>
+  <text x="162" y="196" fill="#cbd5e1" font-size="13">demais</text>
+  <text x="40" y="232" fill="#94a3b8" font-size="13">no ls -l: <tspan font-family="Consolas, Menlo, monospace" fill="#e2e8f0">-rwr-  ana  aviso.txt</tspan></text>
+  <text x="40" y="262" fill="#94a3b8" font-size="13">chmod aceita <tspan font-family="Consolas, Menlo, monospace" fill="#e2e8f0">rwr-</tspan> ou dígitos com r = 4 e w = 2:</text>
+  <text x="40" y="284" fill="#94a3b8" font-size="13"><tspan font-family="Consolas, Menlo, monospace" fill="#e2e8f0">64</tspan> → rwr- · <tspan font-family="Consolas, Menlo, monospace" fill="#e2e8f0">60</tspan> → rw-- · <tspan font-family="Consolas, Menlo, monospace" fill="#e2e8f0">66</tspan> → rwrw</text>
+
+  <!-- fluxo pode() -->
+  <rect x="380" y="100" width="500" height="50" rx="10" fill="#1e293b" stroke="#475569"/>
+  <text x="400" y="122" fill="#f8fafc" font-size="15" font-weight="700">exigir(i-node, "r" ou "w")</text>
+  <text x="400" y="141" fill="#94a3b8" font-size="13">chamado por cada comando antes de agir</text>
+  <line x1="630" y1="150" x2="630" y2="172" stroke="#64748b" stroke-width="2" marker-end="url(#seta)"/>
+
+  <rect x="380" y="176" width="240" height="50" rx="10" fill="#312e81" stroke="#818cf8"/>
+  <text x="400" y="198" fill="#eef2ff" font-size="15" font-weight="700">É o root?</text>
+  <text x="400" y="217" fill="#c7d2fe" font-size="13">sim → pode, como no Unix</text>
+  <rect x="640" y="176" width="240" height="50" rx="10" fill="#312e81" stroke="#818cf8"/>
+  <text x="660" y="198" fill="#eef2ff" font-size="15" font-weight="700">É o dono do i-node?</text>
+  <text x="660" y="217" fill="#c7d2fe" font-size="13">sim → perm[:2] · não → perm[2:]</text>
+  <line x1="760" y1="226" x2="760" y2="248" stroke="#64748b" stroke-width="2" marker-end="url(#seta)"/>
+
+  <rect x="380" y="252" width="500" height="50" rx="10" fill="#1e293b" stroke="#475569"/>
+  <text x="400" y="274" fill="#f8fafc" font-size="15" font-weight="700">A letra pedida está no par?</text>
+  <text x="400" y="293" fill="#94a3b8" font-size="13">"r" in "r-" → lê · "w" in "r-" → não escreve</text>
+  <line x1="510" y1="302" x2="510" y2="324" stroke="#64748b" stroke-width="2" marker-end="url(#seta)"/>
+  <line x1="750" y1="302" x2="750" y2="324" stroke="#64748b" stroke-width="2" marker-end="url(#seta)"/>
+
+  <rect x="380" y="328" width="240" height="50" rx="10" fill="#14532d" stroke="#22c55e"/>
+  <text x="400" y="350" fill="#f0fdf4" font-size="15" font-weight="700">Sim: o comando segue</text>
+  <text x="400" y="369" fill="#bbf7d0" font-size="13">e a transação grava no disco</text>
+  <rect x="640" y="328" width="240" height="50" rx="10" fill="#7f1d1d" stroke="#f87171"/>
+  <text x="660" y="350" fill="#fef2f2" font-size="15" font-weight="700">Não: PermissionError</text>
+  <text x="660" y="369" fill="#fecaca" font-size="13">a transação desfaz tudo</text>
+</svg>

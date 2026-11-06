@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 640" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="seta" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
+    </marker>
+  </defs>
+  <rect width="920" height="640" rx="14" fill="#0f172a"/>
+  <text x="40" y="48" fill="#f8fafc" font-size="22" font-weight="700">Arquitetura</text>
+  <text x="40" y="72" fill="#94a3b8" font-size="14">Em verde, a camada de segurança; em cinza, o armazenamento e a execução dos comandos.</text>
+
+  <!-- usuário -->
+  <rect x="40" y="96" width="840" height="56" rx="10" fill="#312e81" stroke="#818cf8"/>
+  <text x="60" y="120" fill="#eef2ff" font-size="16" font-weight="700">Usuário no terminal</text>
+  <text x="60" y="140" fill="#c7d2fe" font-size="13" font-family="Consolas, Menlo, monospace">ana@myfs&gt; chmod rw-- segredo.txt</text>
+  <line x1="460" y1="152" x2="460" y2="176" stroke="#64748b" stroke-width="2" marker-end="url(#seta)"/>
+
+  <!-- login -->
+  <rect x="40" y="180" width="840" height="56" rx="10" fill="#14532d" stroke="#22c55e"/>
+  <text x="60" y="204" fill="#f0fdf4" font-size="15" font-weight="700">Login obrigatório · main(), autenticar(), login()</text>
+  <text x="60" y="224" fill="#bbf7d0" font-size="13">sem usuário logado, nenhum comando é lido · senha do root definida na primeira execução</text>
+  <line x1="460" y1="236" x2="460" y2="260" stroke="#64748b" stroke-width="2" marker-end="url(#seta)"/>
+
+  <!-- interpretador + transação -->
+  <rect x="40" y="264" width="840" height="56" rx="10" fill="#1e293b" stroke="#475569"/>
+  <text x="60" y="288" fill="#f8fafc" font-size="15" font-weight="700">Interpretador e transação · executar(), transacao()</text>
+  <text x="60" y="308" fill="#94a3b8" font-size="13">separa os argumentos e copia i-nodes e mapas antes de cada comando que altera o disco</text>
+  <line x1="460" y1="320" x2="460" y2="344" stroke="#64748b" stroke-width="2" marker-end="url(#seta)"/>
+
+  <!-- comandos -->
+  <rect x="40" y="348" width="410" height="78" rx="10" fill="#1e293b" stroke="#475569"/>
+  <text x="60" y="374" fill="#f8fafc" font-size="15" font-weight="700">Comandos de arquivos</text>
+  <text x="60" y="395" fill="#94a3b8" font-size="13">cat · echo · cp · mv · rm · mkdir · rmdir · ls · cd · ln</text>
+  <text x="60" y="414" fill="#86efac" font-size="13">+ um exigir() antes de agir em cada um</text>
+  <rect x="470" y="348" width="410" height="78" rx="10" fill="#14532d" stroke="#22c55e"/>
+  <text x="490" y="374" fill="#f0fdf4" font-size="15" font-weight="700">Comandos de segurança</text>
+  <text x="490" y="395" fill="#bbf7d0" font-size="13">chmod · chown · useradd · passwd</text>
+  <text x="490" y="414" fill="#bbf7d0" font-size="13">whoami · logout · ls -l</text>
+  <line x1="245" y1="426" x2="245" y2="450" stroke="#64748b" stroke-width="2" marker-end="url(#seta)"/>
+  <line x1="675" y1="426" x2="675" y2="450" stroke="#64748b" stroke-width="2" marker-end="url(#seta)"/>
+
+  <!-- controle de acesso + contas -->
+  <rect x="40" y="454" width="410" height="78" rx="10" fill="#14532d" stroke="#22c55e"/>
+  <text x="60" y="480" fill="#f0fdf4" font-size="15" font-weight="700">Controle de acesso</text>
+  <text x="60" y="501" fill="#bbf7d0" font-size="13">pode() e exigir(): root, dono ou demais</text>
+  <text x="60" y="520" fill="#bbf7d0" font-size="13">resolver(): leitura em cada diretório do caminho</text>
+  <rect x="470" y="454" width="410" height="78" rx="10" fill="#14532d" stroke="#22c55e"/>
+  <text x="490" y="480" fill="#f0fdf4" font-size="15" font-weight="700">Contas · /etc/shadow</text>
+  <text x="490" y="501" fill="#bbf7d0" font-size="13">usuario:sal:hash · PBKDF2-HMAC-SHA256, 100.000×</text>
+  <text x="490" y="520" fill="#bbf7d0" font-size="13">dono root, permissão rw-- · lido só pelo sistema</text>
+  <line x1="245" y1="532" x2="245" y2="556" stroke="#64748b" stroke-width="2" marker-end="url(#seta)"/>
+  <line x1="675" y1="532" x2="675" y2="556" stroke="#64748b" stroke-width="2" marker-end="url(#seta)"/>
+
+  <!-- armazenamento -->
+  <rect x="40" y="560" width="840" height="56" rx="10" fill="#1e293b" stroke="#475569"/>
+  <text x="60" y="584" fill="#f8fafc" font-size="15" font-weight="700">Armazenamento · filesystem.img (128 MiB)</text>
+  <text x="60" y="604" fill="#94a3b8" font-size="13">i-nodes com dono e permissões · mapas de ocupação · blocos de 2 KiB · metadados em pickle no início da imagem</text>
+</svg>

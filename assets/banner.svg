@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 380" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <defs>
+    <linearGradient id="fundo" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b1220"/>
+      <stop offset="1" stop-color="#10233a"/>
+    </linearGradient>
+    <pattern id="grade" width="28" height="28" patternUnits="userSpaceOnUse">
+      <path d="M28 0H0V28" fill="none" stroke="#1c2d44" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect width="1200" height="380" rx="18" fill="url(#fundo)"/>
+  <rect width="1200" height="380" rx="18" fill="url(#grade)" opacity=".55"/>
+
+  <!-- título -->
+  <text x="64" y="104" fill="#5eead4" font-size="16" font-weight="600" letter-spacing="3">PYTHON · SISTEMAS OPERACIONAIS</text>
+  <text x="64" y="166" fill="#f8fafc" font-size="50" font-weight="800">Sistema de Arquivos</text>
+  <text x="64" y="224" fill="#f8fafc" font-size="50" font-weight="800">Multiusuário</text>
+  <text x="64" y="270" fill="#94a3b8" font-size="19">i-nodes, permissões por dono e senhas com hash,</text>
+  <text x="64" y="298" fill="#94a3b8" font-size="19">num disco virtual de 128 MiB.</text>
+
+  <!-- painel ls -l -->
+  <g font-family="Consolas, Menlo, monospace" font-size="17">
+    <rect x="700" y="62" width="440" height="256" rx="12" fill="#0d1117" stroke="#24344d"/>
+    <circle cx="724" cy="86" r="6" fill="#ff5f56"/><circle cx="744" cy="86" r="6" fill="#ffbd2e"/><circle cx="764" cy="86" r="6" fill="#27c93f"/>
+    <text x="724" y="134" fill="#58a6ff">ana@myfs&gt; <tspan fill="#c9d1d9">ls -l</tspan></text>
+
+    <text x="724" y="172" fill="#8b949e">-</text><text x="736" y="172" fill="#5eead4">rw</text><text x="758" y="172" fill="#64748b">--</text>
+    <text x="810" y="172" fill="#c9d1d9">ana</text><text x="880" y="172" fill="#c9d1d9">segredo.txt</text>
+
+    <text x="724" y="204" fill="#8b949e">-</text><text x="736" y="204" fill="#5eead4">rw</text><text x="758" y="204" fill="#e2e8f0">r-</text>
+    <text x="810" y="204" fill="#c9d1d9">ana</text><text x="880" y="204" fill="#c9d1d9">aviso.txt</text>
+
+    <text x="724" y="236" fill="#8b949e">-</text><text x="736" y="236" fill="#5eead4">rw</text><text x="758" y="236" fill="#64748b">--</text>
+    <text x="810" y="236" fill="#d2a8ff">root</text><text x="880" y="236" fill="#c9d1d9">/etc/shadow</text>
+
+    <text x="724" y="282" fill="#3fb950">beto@myfs&gt; <tspan fill="#c9d1d9">cat /etc/shadow</tspan></text>
+    <text x="724" y="306" fill="#f85149">Erro: Permissão negada</text>
+  </g>
+</svg>
